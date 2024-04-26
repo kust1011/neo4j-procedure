@@ -1,7 +1,0 @@
-CREATE (b:Block {number: 5500000, timestamp: 1524611221})
-CREATE (a1:Account {address: '0xe24397398f125fc64c32a109d15a8ce480f936d9'})
-CREATE (a2:Account {address: '0x6dc06ecb14160c05dc1002b2a6aea3cbb4880b12'})
-CREATE (t:Transaction {hash: '0x2f0d6b5287f4f44bc266508ee383a911ab7b06aac0fd65fb91633051e3e958d7'})
-MERGE (a1)-[:`40`]->(t)
-MERGE (t)-[:`40`]->(a2)
-MERGE (b)-[:includes]->(t)
