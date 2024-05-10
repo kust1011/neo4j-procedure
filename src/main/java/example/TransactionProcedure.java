@@ -19,6 +19,10 @@ import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 
 import utility.SafeConvert;
+import utility.Timestamp;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This example demonstrates how to return nodes based on a specific label.
@@ -37,7 +41,11 @@ public class TransactionProcedure {
     /**
      * This procedure returns all nodes with the specified label.
      *
-     * @param labelName The label name to search for.
+     * @param address   The account address.
+     * @param startTime The start time for filtering transactions.
+     * @param endTime   The end time for filtering transactions.
+     * @param minValue  The minimum value for filtering transactions.
+     * @param maxValue  The maximum value for filtering transactions.
      * @return A stream of Nodes found with the specified label.
      */
     @Procedure(name = "ethereum.retrieve.transaction", mode = Mode.READ)
@@ -45,49 +53,102 @@ public class TransactionProcedure {
     public Stream<NodeResult> transactionProcedure(
         @Name("address") String address,
         @Name("startTime") long startTime,
-        @Name("endTime") long endTime
-        ) {
-            try {
+        @Name("endTime") long endTime,
+        @Name("minValue") Double minValue,
+        @Name("maxValue") Double maxValue
+    ) {
+        try {
+            System.out.println("Starting transactionProcedure for address: " + address);
+            System.out.println("Filtering transactions between " + startTime + " and " + endTime);
+            System.out.println("Filtering transactions with value between " + minValue + " and " + maxValue);
 
-                Node account = tx.findNode(ACCOUNT, "address", address.toLowerCase());
+            Node account = tx.findNode(ACCOUNT, "address", address);
 
-                if (account == null) {
-                    log.info("Account not found: " + address);
-                    return Stream.empty();
-                }
-
-                // find the outgoing node, and check if it is a transaction
-                ResourceIterable<Relationship> outgoing = account.getRelationships(OUTGOING);
-                Stream<NodeResult> transactions = outgoing.stream()
-                    .filter(relationship -> relationship.getEndNode().hasLabel(TRANSACTION))
-                    .map(relationship -> new NodeResult(relationship.getEndNode()));
-
-                // (blk:block)-[:includes]->(:transaction)
-                // filter the transaction block
-                // by checking the include block node where startTime < timestamp(blk) < endTime
-                Stream<NodeResult> filteredTransactions = transactions
-                    .filter(nodeResult -> {
-                        Node transaction = nodeResult.node;
-                        ResourceIterable<Relationship> incoming = transaction.getRelationships(INCOMING);
-                        return incoming.stream()
-                            .filter(relationship -> relationship.isType(RelationshipType.withName("includes")))
-                            .filter(relationship -> relationship.getStartNode().hasLabel(Label.label("block")))
-                            .anyMatch(relationship -> {
-                                Node block = relationship.getStartNode();
-                                long timestamp = (long) block.getProperty("timestamp", 0L);
-                                // long timestamp = SafeConvert.toLong(block.getProperty("timestamp", null), 0L);
-                                return startTime <= timestamp && timestamp <= endTime;
-                            });
-                    });
-                
-                return filteredTransactions;
-                
-            } 
-            catch (Exception e) {
-                log.error("Error in transactionProcedure: " + e.getMessage());
-                return null;
+            if (account == null) {
+                System.out.println("Account not found: " + address);
+                return Stream.empty();
             }
+
+            System.out.println("Account found: " + account.toString());
+
+            long startDate = Timestamp.calculateDaysBetween(1529891469000L, startTime);
+            long endDate = Timestamp.calculateDaysBetween(1529891469000L, endTime);
+
+            System.out.println("Calculated startDate: " + startDate + ", endDate: " + endDate);
+
+            List<RelationshipType> relationshipTypes = new ArrayList<>();
+            // for (long i = startDate; i <= endDate; i++) {
+            //     relationshipTypes.add(RelationshipType.withName(String.valueOf(i)));
+            // }
+            relationshipTypes.add(RelationshipType.withName(String.valueOf(1396)));
+
+
+            System.out.println("Generated relationship types for filtering: " + relationshipTypes);
+
+            // ResourceIterable<Relationship> relationships = account.getRelationships(
+            //     relationshipTypes.toArray(new RelationshipType[0])
+            // );
+            ResourceIterable<Relationship> relationships = account.getRelationships(
+                RelationshipType.withName(String.valueOf(1396))
+            );
+
+            // print all information about the relationships
+            relationships.forEach(relationship -> {
+                System.out.println("Relationship found: " + relationship.toString());
+                System.out.println("Start node: " + relationship.getStartNode().toString());
+                System.out.println("End node: " + relationship.getEndNode().toString());
+            });
+
+            Stream<Node> incomingTransactions = relationships.stream()
+                .filter(relationship -> relationship.getEndNode().hasLabel(TRANSACTION))
+                .map(Relationship::getEndNode);
+
+            Stream<Node> outgoingTransactions = relationships.stream()
+                .filter(relationship -> relationship.getStartNode().hasLabel(TRANSACTION))
+                .map(Relationship::getStartNode);
+
+            Stream<Node> transactions = Stream.concat(incomingTransactions, outgoingTransactions)
+                .filter(node -> {
+                    long timestamp = Timestamp.getTimestamp(node);
+                    System.out.println("Filtering node with timestamp: " + timestamp);
+                    return startTime <= timestamp && timestamp <= endTime;
+                })
+                .filter(node -> {
+                    Double value = SafeConvert.toDouble(node.getProperty("value", null), 0.0);
+                    System.out.println("Filtering node with value: " + value);
+                    return minValue <= value && value <= maxValue;
+                });
+
+            long transactionCount = transactions.count();
+            System.out.println("Transactions found: " + transactionCount);
+
+            // Recreate stream as count operation consumes it
+            incomingTransactions = relationships.stream()
+                .filter(relationship -> relationship.getEndNode().hasLabel(TRANSACTION))
+                .map(Relationship::getEndNode);
+
+            outgoingTransactions = relationships.stream()
+                .filter(relationship -> relationship.getStartNode().hasLabel(TRANSACTION))
+                .map(Relationship::getStartNode);
+
+            transactions = Stream.concat(incomingTransactions, outgoingTransactions)
+                .filter(node -> {
+                    long timestamp = Timestamp.getTimestamp(node);
+                    return startTime <= timestamp && timestamp <= endTime;
+                })
+                .filter(node -> {
+                    Double value = SafeConvert.toDouble(node.getProperty("value", null), 0.0);
+                    return minValue <= value && value <= maxValue;
+                });
+
+            return transactions.map(NodeResult::new);
+
+        } catch (Exception e) {
+            System.out.println("Error in transactionProcedure: " + e.getMessage());
+            e.printStackTrace();
+            return Stream.empty();
         }
+    }
 
     /**
      * This class defines the output record for our node search procedure.
