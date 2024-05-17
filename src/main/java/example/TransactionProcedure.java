@@ -10,6 +10,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.ResourceIterable;
+import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.Context;
@@ -18,11 +19,16 @@ import org.neo4j.procedure.Mode;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 
+import static utility.Constant.*;
+import utility.Model.TransactionsAndLabels;
 import utility.SafeConvert;
 import utility.Timestamp;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This example demonstrates how to return nodes based on a specific label.
@@ -48,9 +54,9 @@ public class TransactionProcedure {
      * @param maxValue  The maximum value for filtering transactions.
      * @return A stream of Nodes found with the specified label.
      */
-    @Procedure(name = "ethereum.retrieve.transaction", mode = Mode.READ)
+    @Procedure(name = "chainsecurity.tron.retrieve.transaction", mode = Mode.READ)
     @Description("Retrieve transactions of a given ethereum account.")
-    public Stream<NodeResult> transactionProcedure(
+    public Stream<TransactionsAndLabels> transactionProcedure(
         @Name("address") String address,
         @Name("startTime") long startTime,
         @Name("endTime") long endTime,
@@ -58,6 +64,9 @@ public class TransactionProcedure {
         @Name("maxValue") Double maxValue
     ) {
         try {
+            Map<String, Object> transactionsMap = new HashMap<>();
+            Map<String, Object> labelsMap = new HashMap<>();
+
             System.out.println("Starting transactionProcedure for address: " + address);
             System.out.println("Filtering transactions between " + startTime + " and " + endTime);
             System.out.println("Filtering transactions with value between " + minValue + " and " + maxValue);
@@ -77,20 +86,20 @@ public class TransactionProcedure {
             System.out.println("Calculated startDate: " + startDate + ", endDate: " + endDate);
 
             List<RelationshipType> relationshipTypes = new ArrayList<>();
-            // for (long i = startDate; i <= endDate; i++) {
-            //     relationshipTypes.add(RelationshipType.withName(String.valueOf(i)));
-            // }
-            relationshipTypes.add(RelationshipType.withName(String.valueOf(1396)));
+            for (long i = startDate; i <= endDate; i++) {
+                relationshipTypes.add(RelationshipType.withName(String.valueOf(i)));
+            }
+            // relationshipTypes.add(RelationshipType.withName(String.valueOf(1396)));
 
 
             System.out.println("Generated relationship types for filtering: " + relationshipTypes);
 
-            // ResourceIterable<Relationship> relationships = account.getRelationships(
-            //     relationshipTypes.toArray(new RelationshipType[0])
-            // );
             ResourceIterable<Relationship> relationships = account.getRelationships(
-                RelationshipType.withName(String.valueOf(1396))
+                relationshipTypes.toArray(new RelationshipType[0])
             );
+            // ResourceIterable<Relationship> relationships = account.getRelationships(
+            //     RelationshipType.withName(String.valueOf(1396))
+            // );
 
             // print all information about the relationships
             relationships.forEach(relationship -> {
@@ -119,29 +128,26 @@ public class TransactionProcedure {
                     return minValue <= value && value <= maxValue;
                 });
 
-            long transactionCount = transactions.count();
-            System.out.println("Transactions found: " + transactionCount);
+            
+            transactions.forEach(transaction -> {
+                System.out.println("Processing transaction: " + transaction.toString());
+                Node to = transaction.getRelationships(OUTGOING).iterator().next().getEndNode();
+                System.out.println("Transaction to: " + to.toString());
+                Node from = null;
+                ResourceIterator<Relationship> relationship = transaction.getRelationships(INCOMING).iterator();
+                while (relationship.hasNext()) {
+                    Node potentialFrom = relationship.next().getStartNode();
+                    if (potentialFrom.hasLabel(ACCOUNT)) {
+                        from = potentialFrom;
+                        break;
+                    }
+                }
+                System.out.println("Transaction from: " + from.toString());
 
-            // Recreate stream as count operation consumes it
-            incomingTransactions = relationships.stream()
-                .filter(relationship -> relationship.getEndNode().hasLabel(TRANSACTION))
-                .map(Relationship::getEndNode);
+                getResult(transaction, from, to, transactionsMap, labelsMap);
+            });
 
-            outgoingTransactions = relationships.stream()
-                .filter(relationship -> relationship.getStartNode().hasLabel(TRANSACTION))
-                .map(Relationship::getStartNode);
-
-            transactions = Stream.concat(incomingTransactions, outgoingTransactions)
-                .filter(node -> {
-                    long timestamp = Timestamp.getTimestamp(node);
-                    return startTime <= timestamp && timestamp <= endTime;
-                })
-                .filter(node -> {
-                    Double value = SafeConvert.toDouble(node.getProperty("value", null), 0.0);
-                    return minValue <= value && value <= maxValue;
-                });
-
-            return transactions.map(NodeResult::new);
+            return Stream.of(new TransactionsAndLabels(transactionsMap, labelsMap));
 
         } catch (Exception e) {
             System.out.println("Error in transactionProcedure: " + e.getMessage());
@@ -150,6 +156,51 @@ public class TransactionProcedure {
         }
     }
 
+
+    private void getResult(Node transaction, Node from, Node to, Map<String, Object> transactionsMap, Map<String, Object> labelsMap){
+        String hash = SafeConvert.toString(transaction.getProperty("hash", null), "");
+        long timestamp = Timestamp.getTimestamp(transaction);
+        double value = SafeConvert.toDouble(transaction.getProperty("value", null), 0D);
+        String fromLabel = from.getDegree() > EXCHANGE_THRESHOLD ? "deposit" : null;
+        String toLabel = to.getDegree() > EXCHANGE_THRESHOLD ? "deposit" : null;
+        String fromAddress = SafeConvert.toString(from.getProperty("address", null), "");
+        String toAddress = SafeConvert.toString(to.getProperty("address", null), "");
+
+        System.out.println("Transaction hash: " + hash);
+        if (fromLabel != null) {
+            HashSet<String> existingLabels = (HashSet<String>) labelsMap.get(fromLabel);
+            if (existingLabels != null) {
+                existingLabels.add(fromLabel);
+                labelsMap.put(fromAddress, existingLabels);
+            } else {
+                HashSet<String> newLabel = new HashSet<String>();
+                newLabel.add(fromLabel);
+                labelsMap.put(fromAddress, newLabel);
+            }
+        }
+        if (toLabel != null) {
+            HashSet<String> existingLabels = (HashSet<String>) labelsMap.get(toLabel);
+            if (existingLabels != null) {
+                existingLabels.add(fromLabel);
+                labelsMap.put(fromAddress, existingLabels);
+            } else {
+                HashSet<String> newLabel = new HashSet<String>();
+                newLabel.add(fromLabel);
+                labelsMap.put(fromAddress, newLabel);
+            }
+        }
+
+        transactionsMap.put(transaction.getElementId(), new HashMap<>() {{
+            put("hash", hash);
+            put("timestamp", timestamp);
+            put("value", value);
+            put("from", fromAddress);
+            put("to", toAddress);
+        }});
+
+        System.out.println("Transaction result: " + transactionsMap);
+
+    }
     /**
      * This class defines the output record for our node search procedure.
      * Each node returned by the procedure will be wrapped in a NodeResult object.
