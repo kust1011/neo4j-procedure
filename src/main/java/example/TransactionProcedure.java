@@ -60,8 +60,8 @@ public class TransactionProcedure {
         @Name("address") String address,
         @Name("startTime") long startTime,
         @Name("endTime") long endTime,
-        @Name("minValue") Double minValue,
-        @Name("maxValue") Double maxValue
+        @Name("minValue") Long minValue,
+        @Name("maxValue") Long maxValue
     ) {
         try {
             Map<String, Object> transactionsMap = new HashMap<>();
@@ -80,8 +80,8 @@ public class TransactionProcedure {
 
             System.out.println("Account found: " + account.toString());
 
-            long startDate = Timestamp.calculateDaysBetween(1529891469000L, startTime);
-            long endDate = Timestamp.calculateDaysBetween(1529891469000L, endTime);
+            long startDate = Timestamp.calculateDaysBetween(TRON_GENESIS_TIMESTAMP, startTime);
+            long endDate = Timestamp.calculateDaysBetween(TRON_GENESIS_TIMESTAMP, endTime);
 
             System.out.println("Calculated startDate: " + startDate + ", endDate: " + endDate);
 
@@ -89,7 +89,6 @@ public class TransactionProcedure {
             for (long i = startDate; i <= endDate; i++) {
                 relationshipTypes.add(RelationshipType.withName(String.valueOf(i)));
             }
-            // relationshipTypes.add(RelationshipType.withName(String.valueOf(1396)));
 
 
             System.out.println("Generated relationship types for filtering: " + relationshipTypes);
@@ -97,9 +96,6 @@ public class TransactionProcedure {
             ResourceIterable<Relationship> relationships = account.getRelationships(
                 relationshipTypes.toArray(new RelationshipType[0])
             );
-            // ResourceIterable<Relationship> relationships = account.getRelationships(
-            //     RelationshipType.withName(String.valueOf(1396))
-            // );
 
             // print all information about the relationships
             relationships.forEach(relationship -> {
@@ -123,7 +119,7 @@ public class TransactionProcedure {
                     return startTime <= timestamp && timestamp <= endTime;
                 })
                 .filter(node -> {
-                    Double value = SafeConvert.toDouble(node.getProperty("value", null), 0.0);
+                    Long value = SafeConvert.toLong(node.getProperty("value", null), 0L);
                     System.out.println("Filtering node with value: " + value);
                     return minValue <= value && value <= maxValue;
                 });
@@ -160,7 +156,9 @@ public class TransactionProcedure {
     private void getResult(Node transaction, Node from, Node to, Map<String, Object> transactionsMap, Map<String, Object> labelsMap){
         String hash = SafeConvert.toString(transaction.getProperty("hash", null), "");
         long timestamp = Timestamp.getTimestamp(transaction);
-        double value = SafeConvert.toDouble(transaction.getProperty("value", null), 0D);
+        long fee = SafeConvert.toLong(transaction.getProperty("fee", null), 0L);
+        long value = SafeConvert.toLong(transaction.getProperty("value", null), 0L);
+        long transaction_index = SafeConvert.toLong(transaction.getProperty("transaction_index", null), 0L);
         String fromLabel = from.getDegree() > EXCHANGE_THRESHOLD ? "deposit" : null;
         String toLabel = to.getDegree() > EXCHANGE_THRESHOLD ? "deposit" : null;
         String fromAddress = SafeConvert.toString(from.getProperty("address", null), "");
@@ -194,6 +192,8 @@ public class TransactionProcedure {
             put("hash", hash);
             put("timestamp", timestamp);
             put("value", value);
+            put("fee", fee);
+            put("transaction_index", transaction_index);
             put("from", fromAddress);
             put("to", toAddress);
         }});

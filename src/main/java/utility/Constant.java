@@ -14,4 +14,6 @@ public class Constant {
     public static final int SENVEN_DAY_RANGE = 604800;
 
     public static final int SENVEN_DAY_RANGE_MILLI = 604800000;
+
+    public static final long TRON_GENESIS_TIMESTAMP = 1529891469000L;
 }
