@@ -132,10 +132,18 @@ public class TokenTransferProcedure {
             
             tokenTransfers.forEach(tokenTransfer -> {
                 System.out.println("Processing tokenTransfer: " + tokenTransfer.toString());
-                Node to = tokenTransfer.getRelationships(OUTGOING).iterator().next().getEndNode();
+                Node to = null;
+                ResourceIterator<Relationship> relationship = tokenTransfer.getRelationships(OUTGOING).iterator();
+                while (relationship.hasNext()) {
+                    Node potentialFrom = relationship.next().getEndNode();
+                    if (potentialFrom.hasLabel(ACCOUNT)) {
+                        to = potentialFrom;
+                        break;
+                    }
+                }
                 System.out.println("TokenTransfer to: " + to.toString());
                 Node from = null;
-                ResourceIterator<Relationship> relationship = tokenTransfer.getRelationships(INCOMING).iterator();
+                relationship = tokenTransfer.getRelationships(INCOMING).iterator();
                 while (relationship.hasNext()) {
                     Node potentialFrom = relationship.next().getStartNode();
                     if (potentialFrom.hasLabel(ACCOUNT)) {

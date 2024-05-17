@@ -127,10 +127,18 @@ public class TransactionProcedure {
             
             transactions.forEach(transaction -> {
                 System.out.println("Processing transaction: " + transaction.toString());
-                Node to = transaction.getRelationships(OUTGOING).iterator().next().getEndNode();
+                Node to = null;
+                ResourceIterator<Relationship> relationship = transaction.getRelationships(OUTGOING).iterator();
+                while (relationship.hasNext()) {
+                    Node potentialFrom = relationship.next().getEndNode();
+                    if (potentialFrom.hasLabel(ACCOUNT)) {
+                        to = potentialFrom;
+                        break;
+                    }
+                }
                 System.out.println("Transaction to: " + to.toString());
                 Node from = null;
-                ResourceIterator<Relationship> relationship = transaction.getRelationships(INCOMING).iterator();
+                relationship = transaction.getRelationships(INCOMING).iterator();
                 while (relationship.hasNext()) {
                     Node potentialFrom = relationship.next().getStartNode();
                     if (potentialFrom.hasLabel(ACCOUNT)) {
