@@ -30,9 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-/**
- * This example demonstrates how to return nodes based on a specific label.
- */
 public class TransactionProcedure {
 
     static final Label ACCOUNT = Label.label("account");
@@ -45,15 +42,17 @@ public class TransactionProcedure {
     public Transaction tx;
 
     /**
-     * This procedure returns all nodes with the specified label.
+     * Retrieves all transaction nodes associated with a specified account address, filtered by a defined 
+     * time range and transaction value limits.
      *
-     * @param address   The account address.
-     * @param startTime The start time for filtering transactions.
-     * @param endTime   The end time for filtering transactions.
-     * @param minValue  The minimum value for filtering transactions.
-     * @param maxValue  The maximum value for filtering transactions.
-     * @return A stream of Nodes found with the specified label.
+     * @param address   The unique address of the account involved in the transactions.
+     * @param startTime The start timestamp (inclusive) for filtering transactions based on their timestamp.
+     * @param endTime   The end timestamp (inclusive) for filtering transactions based on their timestamp.
+     * @param minValue  The minimum transaction value (inclusive) for filtering transactions based on their value.
+     * @param maxValue  The maximum transaction value (inclusive) for filtering transactions based on their value.
+     * @return A stream of transaction nodes that match the specified filters.
      */
+
     @Procedure(name = "chainsecurity.tron.retrieve.transaction", mode = Mode.READ)
     @Description("Retrieve transactions of a given ethereum account.")
     public Stream<TransactionsAndLabels> transactionProcedure(
@@ -124,7 +123,6 @@ public class TransactionProcedure {
                     return minValue <= value && value <= maxValue;
                 });
 
-            
             transactions.forEach(transaction -> {
                 System.out.println("Processing transaction: " + transaction.toString());
                 Node to = null;
@@ -208,16 +206,5 @@ public class TransactionProcedure {
 
         System.out.println("Transaction result: " + transactionsMap);
 
-    }
-    /**
-     * This class defines the output record for our node search procedure.
-     * Each node returned by the procedure will be wrapped in a NodeResult object.
-     */
-    public static class NodeResult {
-        public Node node;
-
-        public NodeResult(Node node) {
-            this.node = node;
-        }
     }
 }

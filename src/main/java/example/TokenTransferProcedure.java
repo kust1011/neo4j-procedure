@@ -30,9 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-/**
- * This example demonstrates how to return nodes based on a specific label.
- */
 public class TokenTransferProcedure {
 
     static final Label ACCOUNT = Label.label("account");
@@ -46,15 +43,17 @@ public class TokenTransferProcedure {
     public Transaction tx;
 
     /**
-     * This procedure returns all nodes with the specified label.
+     * Retrieves all nodes corresponding to token transfers associated with a specified account address
+     * within a defined time range and value limits.
      *
-     * @param address   The account address.
-     * @param startTime The start time for filtering tokenTransfers.
-     * @param endTime   The end time for filtering tokenTransfers.
-     * @param minValue  The minimum value for filtering tokenTransfers.
-     * @param maxValue  The maximum value for filtering tokenTransfers.
-     * @return A stream of Nodes found with the specified label.
+     * @param address   The unique address of the account.
+     * @param startTime The start timestamp (inclusive) for filtering token transfers.
+     * @param endTime   The end timestamp (inclusive) for filtering token transfers.
+     * @param minValue  The minimum transaction value (inclusive) for filtering token transfers.
+     * @param maxValue  The maximum transaction value (inclusive) for filtering token transfers.
+     * @return A stream of nodes representing token transfers that meet the specified criteria.
      */
+
     @Procedure(name = "chainsecurity.tron.retrieve.tokenTransfer", mode = Mode.READ)
     @Description("Retrieve tokenTransfer of a given tron account.")
     public Stream<TransactionsAndLabels> getTokenTransfer(
@@ -90,7 +89,6 @@ public class TokenTransferProcedure {
             for (long i = startDate; i <= endDate; i++) {
                 relationshipTypes.add(RelationshipType.withName(String.valueOf(i)));
             }
-            // relationshipTypes.add(RelationshipType.withName(String.valueOf(1396)));
 
 
             System.out.println("Generated relationship types for filtering: " + relationshipTypes);
@@ -98,9 +96,6 @@ public class TokenTransferProcedure {
             ResourceIterable<Relationship> relationships = account.getRelationships(
                 relationshipTypes.toArray(new RelationshipType[0])
             );
-            // ResourceIterable<Relationship> relationships = account.getRelationships(
-            //     RelationshipType.withName(String.valueOf(1396))
-            // );
 
             // print all information about the relationships
             relationships.forEach(relationship -> {
@@ -214,16 +209,5 @@ public class TokenTransferProcedure {
 
         System.out.println("TokenTransfer result: " + tokenTransfersMap);
 
-    }
-    /**
-     * This class defines the output record for our node search procedure.
-     * Each node returned by the procedure will be wrapped in a NodeResult object.
-     */
-    public static class NodeResult {
-        public Node node;
-
-        public NodeResult(Node node) {
-            this.node = node;
-        }
     }
 }
