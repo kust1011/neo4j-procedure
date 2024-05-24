@@ -1,5 +1,7 @@
 package utility;
 
+import java.math.BigInteger;
+
 public class SafeConvert {
     public static boolean toBoolean(Object value, boolean defaultValue) {
         if (value instanceof String) {
@@ -39,6 +41,19 @@ public class SafeConvert {
             }
         } else if (value instanceof Number) {
             return ((Number) value).longValue();
+        }
+        return defaultValue;
+    }
+
+    public static BigInteger toBigInteger(Object value, BigInteger defaultValue) {
+        if (value instanceof String) {
+            try {
+                return new BigInteger((String) value);
+            } catch (NumberFormatException e) {
+                return defaultValue;
+            }
+        } else if (value instanceof Number) {
+            return BigInteger.valueOf(((Number) value).longValue());
         }
         return defaultValue;
     }
